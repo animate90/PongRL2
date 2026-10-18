@@ -93,8 +93,8 @@ class ReplayBuffer:
     def filled(self):
         return self.currentSize > self.batch_size
 
-    def save_buffer(self, directory):
-        path = Path(directory) / "replayBuffer"
+    def save_buffer(self, directory, name = "replayBuffer"):
+        path = Path(directory) / name
         arrays = ["states", "actions", "rewards", "next_states", "dones"]
         for array in arrays:
             p = path / array

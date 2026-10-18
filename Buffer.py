@@ -20,6 +20,7 @@ class FrameBuffer(object):
         frame = cv2.cvtColor(input_frame, cv2.COLOR_RGB2GRAY)  # to grea
         frame = frame[30:,:] # crop scores
         frame = cv2.resize(frame, (84, 84), interpolation=cv2.INTER_AREA) # resize
+        #frame = frame.astype(np.float32) / 255.0
         frame = frame.astype(np.float32) / 255.0
         return frame
 
@@ -80,18 +81,3 @@ class ReplayBuffer:
     def filled(self):
         return self.currentSize > self.batch_size
 
-
-# for later
-# preprocess frames and take their max based on Minh 2015 paper
-def preprocess_frames(frames=[]):
-    frame = cv2.cvtColor(frames[0], cv2.COLOR_RGB2GRAY)
-    frame = cv2.resize(frame, (84,84), interpolation=cv2.INTER_AREA)
-
-    if len(frames) > 1:
-        for f in frames[1:]:
-            frame_read = cv2.cvtColor(f, cv2.COLOR_RGB2GRAY)
-            frame_read = cv2.resize(frame_read, (84, 84), interpolation=cv2.INTER_AREA)
-
-            frame = cv2.max(frame, frame_read)
-
-    return frame / 255.

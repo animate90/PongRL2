@@ -1,0 +1,5 @@
+- test multi env
+- implement reards per episode
+- add replay start size
+- match exactly hyperparameters from
+- double the the correct data handling of float and int (/255)

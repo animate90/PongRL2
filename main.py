@@ -59,13 +59,17 @@ states, infos = envs.reset(seed=[100 + i for i in range(config.numberEnvs)])
 
 Data = Utilities.CollectData()
 
-for f in range(config.final_exploration_iteration):
+# adjust for vectoritdev env
+newRange = float( config.final_exploration_iteration / config.numberEnvs )
+
+
+for f in range(int(newRange)):
     # save state
     if frameBuffers.filled():
         states = frameBuffers.return_stack()
 
     # Agent -- choose action
-    epsilon = Utilities.lerp(config.initial_epsilon, config.final_epsilon, f/config.final_exploration_iteration)
+    epsilon = Utilities.lerp(config.initial_epsilon, config.final_epsilon, f/ newRange)
     actions = agents.select_actions(epsilon, Network_Prediction, device, frameBuffers)
 
     next_states, rewards, truncateds, terminateds, infos = envs.step(actions)
@@ -90,39 +94,40 @@ for f in range(config.final_exploration_iteration):
 
     # train network
     if replayBuffer.filled():
-        Buffer = replayBuffer.sample()
-        states = Buffer["states"]
-        next_states = Buffer["next_states"]
-        rewards = Buffer["rewards"]
-        actions = Buffer["actions"]
-        dones = Buffer["dones"]
+        # gradient descent for each env
+        for step in range(config.numberEnvs):
+            Buffer = replayBuffer.sample()
+            states = Buffer["states"]
+            next_states = Buffer["next_states"]
+            rewards = Buffer["rewards"]
+            actions = Buffer["actions"]
+            dones = Buffer["dones"]
 
-        Network_Prediction.zero_grad()
+            Network_Prediction.zero_grad()
 
-        # Current Q-values
-        predicted_q = Network_Prediction(states.float().div(255)).gather(1, actions.unsqueeze(1)).squeeze(1)
+            # Current Q-values
+            predicted_q = Network_Prediction(states.float().div(255)).gather(1, actions.unsqueeze(1)).squeeze(1)
 
-        # DQN Target
-        with torch.no_grad():
-            best_actions = Network_Prediction(next_states.float().div(255)).argmax(dim=1, keepdim=True)
-            next_q = Network_Target(next_states.float().div(255)).gather(1, best_actions).squeeze(1)
-            target_q = rewards + (config.discount_factor * next_q * (1.0 - dones.float()))
+            # DQN Target
+            with torch.no_grad():
+                best_actions = Network_Prediction(next_states.float().div(255)).argmax(dim=1, keepdim=True)
+                next_q = Network_Target(next_states.float().div(255)).gather(1, best_actions).squeeze(1)
+                target_q = rewards + (config.discount_factor * next_q * (1.0 - dones.float()))
 
-            # td error
-            td_error = target_q - predicted_q
-            #print(float(td_error.mean() ) )
-            Data.addTDError( float(td_error.mean() ))
+                # td error
+                td_error = target_q - predicted_q
+                Data.addTDError( float(td_error.mean() ))
 
-        loss = criterion(predicted_q, target_q)
+            loss = criterion(predicted_q, target_q)
 
-        optim.zero_grad()
-        loss.backward()
-        optim.step()
+            optim.zero_grad()
+            loss.backward()
+            optim.step()
 
-        # save data
-        Data.addLosses(loss.item())
-        Data.addAverageQValues(predicted_q.mean().item())
-        Data.addEpsilon(epsilon)
+            # save data
+            Data.addLosses(loss.item())
+            Data.addAverageQValues(predicted_q.mean().item())
+            Data.addEpsilon(epsilon)
         # update target net
         if f % config.target_network_update_freq == 0:
             print("!! update target network !!")

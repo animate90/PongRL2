@@ -1,8 +1,10 @@
 from collections import deque
+from typing import Deque
 
 import matplotlib.pyplot as plt
 
 import statistics
+import types
 
 from pathlib import Path
 
@@ -17,8 +19,61 @@ def plotState(state):
 def lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * t
 
+class Scores:
+    def __init__(self, scoresDequeSize=1000):
+        self.scoresDeque = {}
+        self.scoresDeque["agent"] = Deque(maxlen=scoresDequeSize)
+        self.scoresDeque["computer"] = Deque(maxlen=scoresDequeSize)
+    def addScore(self, rewards ):
+        # score vector
+        for i,reward in enumerate(rewards):
+            if reward != 0:
+                if reward == 1:
+                    self.scoresDeque["agent"].append(1)
+                    self.scoresDeque["computer"].append(0)
+                else:
+                    self.scoresDeque["agent"].append(0)
+                    self.scoresDeque["computer"].append(1)
+    def ReturnAverageScores(self):
+
+        if len(self.scoresDeque["agent"]) >10:
+            AgentScores = statistics.mean(self.scoresDeque["agent"])
+            ComputerScores = statistics.mean(self.scoresDeque["computer"])
+            return {"agent": AgentScores, "computer": ComputerScores}
+
+        else:
+            return {"agent": 0, "computer": 0}
+
+
+def get_clean_hparams(module_or_dict):
+    """Extracts non-dunder variables and keeps only float, int, or bool types."""
+    source = (
+        vars(module_or_dict)
+        if not isinstance(module_or_dict, dict)
+        else module_or_dict
+    )
+
+    # Inner helper function to validate allowed types
+    def is_target_type(value):
+        # isinstance(val, (int, float, bool)) checks for strictly int, float, or bool
+        # (Note: in Python, bool is a subclass of int, so both are cleanly handled)
+        return isinstance(value, (float, int, bool))
+
+    # Filter out dunders, callables, modules, and keep only matching types
+    filtered = {
+        k: v
+        for k, v in source.items()
+        if not k.startswith("__")
+        and not callable(v)
+        and not isinstance(v, types.ModuleType)
+        and is_target_type(v)
+    }
+
+    return filtered
+
+"""
 class CollectData:
-    def __init__(self, ScoresDequeLength = 1000):
+    def __init__(self, ScoresDequeLength = 1000, configs={}):
         # from game replay
         self.scoresDeque = {"agent": deque(maxlen=ScoresDequeLength), "computer": deque(maxlen=ScoresDequeLength)}
         self.ScoresAverages = {"agent": [], "computer": []}
@@ -28,6 +83,7 @@ class CollectData:
         self.losses = []
         self.averageQlosses = []
         self.tdErrors = []
+        self.configs = configs
 
     def addScore(self, rewards ):
         # score vector
@@ -82,3 +138,4 @@ class CollectData:
 
     def save(self, directory):
         path = Path(directory) / "replayBuffer"
+"""
