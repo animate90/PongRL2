@@ -5,10 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import config
 
-
-
-actionSpace = 6
-
+from pathlib import Path
 
 
 class FrameBuffer(object):
@@ -21,29 +18,43 @@ class FrameBuffer(object):
         frame = frame[30:,:] # crop scores
         frame = cv2.resize(frame, (84, 84), interpolation=cv2.INTER_AREA) # resize
         #frame = frame.astype(np.float32) / 255.0
-        frame = frame.astype(np.float32) / 255.0
+        frame = frame.astype(np.uint8)
         return frame
 
-    def addFrame(self, input_frame):
-        frame = self.preprocess_frame_single(input_frame)
-        self.frames.append(frame)
+    def addFrames(self, input_frames):
+        for index in range(self.numberEnvs):
+            frame = self.preprocess_frame_single(input_frames[index])
+            self.frames[index].append(frame)
 
     def return_stack(self):
-        stack = np.stack(self.frames)
+        stackFrameBuffer = []
+        for envIndex in range(self.numberEnvs):
+            stackFrameBuffer.append(np.stack(self.frames[envIndex]))
+        stack = np.stack(stackFrameBuffer)
         return torch.from_numpy(stack).float()
 
     def filled(self):
-        return self.frameBufferSize == len(self.frames)
+        # make it fail save to go through each env
+        return self.frameBufferSize == len(self.frames[0])
 
-    def display_stack(self):
-        stack = self.return_stack()
+    def display_stack(self, envIndex=0):
+        stack = self.return_stack()[envIndex]
         plt.imshow(torch.hstack([x.squeeze() for x in stack.split(1)]),cmap='gray')
         plt.axis('off')
+        plt.title(f'env {envIndex}')
         plt.show()
         plt.close()
 
+    def display_stacks(self):
+        stack = self.return_stack()
+        tiled_image = stack.permute(0, 2, 1, 3).reshape(stack.shape[0] * 84, stack.shape[1] * 84)
+        plt.figure(figsize=(12, 12))
+        plt.imshow(tiled_image, cmap="gray")
+        plt.axis("off")  # Hides axis ticks and borders
+        plt.show()
+
 class ReplayBuffer:
-    def __init__(self, capacity =10000, batch_size=64,frameBufferSize=4):
+    def __init__(self, capacity = 10000, batch_size=64,frameBufferSize=4):
         self.capacity = capacity
         self.device = config.device
         self.batch_size = batch_size
@@ -51,9 +62,9 @@ class ReplayBuffer:
         self.frameBufferSize = frameBufferSize
         self.currentSize = 0
 
-        self.states = np.zeros((self.capacity, self.frameBufferSize, 84, 84), dtype=np.float32)  # 4 stacked frames
-        self.next_states = np.zeros((self.capacity, self.frameBufferSize, 84, 84), dtype=np.float32)
-        self.actions = np.zeros((self.capacity,), dtype=np.int64)
+        self.states = np.zeros((self.capacity, self.frameBufferSize, 84, 84), dtype=np.uint8)  # 4 stacked frames
+        self.next_states = np.zeros((self.capacity, self.frameBufferSize, 84, 84), dtype=np.uint8)
+        self.actions = np.zeros((self.capacity,), dtype=np.int8)
         self.rewards = np.zeros((self.capacity,), dtype=np.float32)
         self.dones = np.zeros((self.capacity,), dtype=np.bool_)
 
@@ -81,3 +92,13 @@ class ReplayBuffer:
     def filled(self):
         return self.currentSize > self.batch_size
 
+    def save_buffer(self, directory, name = "replayBuffer"):
+        path = Path(directory) / name
+        arrays = ["states", "actions", "rewards", "next_states", "dones"]
+        for array in arrays:
+            p = path / array
+            p.mkdir(parents=True, exist_ok=True)
+            value = getattr(self, array)
+            filename = array + ".npy"
+            np.savez_compressed(p / filename, value)
+            #np.save(p / filename, value)

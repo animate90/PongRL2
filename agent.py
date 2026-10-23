@@ -1,4 +1,3 @@
-import Utilities
 import numpy as np
 
 import BufferVectorized
@@ -7,23 +6,41 @@ import Networks
 
 import torch
 
+import Utilities
+
 class agents:
     def __init__(self, envs : gym.vector.SyncVectorEnv):
         self.epsilon = 1.0
         self.envs = envs
 
-    def select_actions(self,epsilon : float, network_Prediction : Networks.DQN() ,device, frameBuffers : BufferVectorized.FrameBuffer()):
+    def select_actions(self,epsilon : float, network_Prediction : Networks.DQN ,device, frameBuffers : BufferVectorized.FrameBuffer, num_envs: int, currentFrame =0 ):
         self.epsilon = epsilon
-        # -- random
-        if np.random.random() < self.epsilon or not frameBuffers.filled():
-            return  self.envs.action_space.sample()
-        # -- predicted
-        else:
-            current_stack = frameBuffers.return_stack()
-            with torch.no_grad():
-                state = current_stack.float().to(device)
-                q_values = network_Prediction(state)
-                return q_values.argmax(dim=1).cpu().numpy()
+        self.num_envs = num_envs
+
+        current_stack = frameBuffers.return_stack()
+        states = current_stack.float().div(255.0).to(device)
+
+        with torch.no_grad():
+            q_values = network_Prediction(states)
+            greedy_actions =  q_values.argmax(dim=1).cpu().numpy()
+            """
+            action_seperated = np.zeros((num_envs), dtype = np.uint8)
+            for i,state in enumerate(states):
+                state1 =  torch.unsqueeze(state, 0)
+                #print(state1.shape)
+                q_values = network_Prediction(state1)
+                #print("qvalues {0}".format(i))
+                #print(q_values.argmax(dim=1).cpu().numpy())
+                print(q_values.argmax(dim=1).cpu().numpy().item())
+                action_seperated[i] = q_values.argmax(dim=1).cpu().numpy().item()
+            print(action_seperated)
+            """
+        random_actions = self.envs.action_space.sample()
+        explore_mask = np.random.random(self.num_envs) < epsilon
+
+        actions = np.where(explore_mask, random_actions, greedy_actions)
+        return actions
+
 
 class epsilonDecay():
     def __init__(self, epsilon_initial = 1, epsilon_final = 0.1, epsilon_decay_Start = 25000,epsilon_decay_End = 200000):

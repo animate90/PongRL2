@@ -16,23 +16,39 @@ class FrameBuffer(object):
 
     def preprocess_frame_single(self, input_frame):
         frame = cv2.cvtColor(input_frame, cv2.COLOR_RGB2GRAY)  # to grea
-        frame = frame[30:,:] # crop scores
+        frame = frame[34:194,:] # crop scores
         frame = cv2.resize(frame, (84, 84), interpolation=cv2.INTER_AREA) # resize
-        #frame = frame.astype(np.float32) / 255.0
-        frame = frame.astype(np.int8)
+        frame = frame.astype(np.uint8)
+
+        # remap grey values
+        minIn, maxIn = 87,147
+        lut = np.clip((np.arange(256) - minIn) * (255.0 / (maxIn - minIn)), 0, 255).astype(
+            np.uint8
+        )
+        frame = cv2.LUT(frame, lut)
+
         return frame
 
     def addFrames(self, input_frames):
-        for index in range(self.numberEnvs):
-            frame = self.preprocess_frame_single(input_frames[index])
-            self.frames[index].append(frame)
+        for EnvIndex in range(self.numberEnvs):
+            frame = self.preprocess_frame_single(input_frames[EnvIndex])
+            self.frames[EnvIndex].append(frame)
+
+    def addFrameSingleEnv(self,env, input_frame):
+
+        frame = self.preprocess_frame_single(input_frame)
+        self.frames[env].append(frame)
 
     def return_stack(self):
-        stackFrameBuffer = []
-        for envIndex in range(self.numberEnvs):
-            stackFrameBuffer.append(np.stack(self.frames[envIndex]))
-        stack = np.stack(stackFrameBuffer)
-        return torch.from_numpy(stack).float()
+        if not self.frames or len(self.frames[0]) < self.frameBufferSize:
+            return torch.zeros(
+                (self.numberEnvs, self.frameBufferSize, 84, 84), dtype=torch.uint8
+            )
+
+        stack = np.stack([np.stack(self.frames[i]) for i in range(self.numberEnvs)])
+        return torch.from_numpy(stack).to(dtype=torch.uint8)
+
+
 
     def filled(self):
         # make it fail save to go through each env
@@ -40,7 +56,7 @@ class FrameBuffer(object):
 
     def display_stack(self, envIndex=0):
         stack = self.return_stack()[envIndex]
-        plt.imshow(torch.hstack([x.squeeze() for x in stack.split(1)]),cmap='gray')
+        plt.imshow(torch.hstack([x.squeeze() for x in stack.split(1)]),cmap="gray")
         plt.axis('off')
         plt.title(f'env {envIndex}')
         plt.show()
@@ -63,8 +79,8 @@ class ReplayBuffer:
         self.frameBufferSize = frameBufferSize
         self.currentSize = 0
 
-        self.states = np.zeros((self.capacity, self.frameBufferSize, 84, 84), dtype=np.int8)  # 4 stacked frames
-        self.next_states = np.zeros((self.capacity, self.frameBufferSize, 84, 84), dtype=np.int8)
+        self.states = np.zeros((self.capacity, self.frameBufferSize, 84, 84), dtype=np.uint8)  # 4 stacked frames
+        self.next_states = np.zeros((self.capacity, self.frameBufferSize, 84, 84), dtype=np.uint8)
         self.actions = np.zeros((self.capacity,), dtype=np.int64)
         self.rewards = np.zeros((self.capacity,), dtype=np.float32)
         self.dones = np.zeros((self.capacity,), dtype=np.bool_)
@@ -80,8 +96,8 @@ class ReplayBuffer:
         self.currentSize = min(self.currentSize + 1, self.capacity)
 
     def sample(self):
-        self.batch_size = min(self.currentSize, self.batch_size)
-        indices = np.random.randint(0, self.currentSize, self.batch_size)
+        batch_size = min(self.currentSize, self.batch_size)
+        indices = np.random.randint(0, self.currentSize, batch_size)
         return {
             'states': torch.from_numpy(self.states[indices]).to(self.device),
             'actions': torch.from_numpy(self.actions[indices]).to(self.device),

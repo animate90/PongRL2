@@ -1,5 +1,15 @@
-- test multi env
-- implement reards per episode
-- add replay start size
-- match exactly hyperparameters from
-- double the the correct data handling of float and int (/255)
+ensure the black are black
+
+
+"""implement wrapper preprocessing
+from gymnasium.wrappers import AtariPreprocessing
+
+env = gym.make("ALE/Pong-v5", frameskip=1)
+env = AtariPreprocessing(env, frame_skip=4, screen_size=84, grayscale_obs=True)
+
+
+## for taster non headless training
+env = gym.make("ALE/Pong-v5", render_mode="human")
+
+# Increase the target rendering FPS (e.g., set to 240, 500, or higher)
+env.metadata["render_fps"] = 240

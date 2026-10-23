@@ -62,8 +62,10 @@ writer.add_text("Hyperparameter", result, global_step=0)
 
 for f in range(config.maximumFrames):
     # save state
+
     if frameBuffers.filled():
         states = frameBuffers.return_stack()
+        #frameBuffers.display_stack()
 
     # Agent -- choose action
     actions = agents.select_actions( epsilon.get_epsilon(f), Network_Prediction, device, frameBuffers)
@@ -97,6 +99,7 @@ for f in range(config.maximumFrames):
         rewards = Buffer["rewards"]
         actions = Buffer["actions"]
         dones = Buffer["dones"]
+
 
         Network_Prediction.zero_grad()
 
