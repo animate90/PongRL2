@@ -23,24 +23,12 @@ class agents:
         with torch.no_grad():
             q_values = network_Prediction(states)
             greedy_actions =  q_values.argmax(dim=1).cpu().numpy()
-            """
-            action_seperated = np.zeros((num_envs), dtype = np.uint8)
-            for i,state in enumerate(states):
-                state1 =  torch.unsqueeze(state, 0)
-                #print(state1.shape)
-                q_values = network_Prediction(state1)
-                #print("qvalues {0}".format(i))
-                #print(q_values.argmax(dim=1).cpu().numpy())
-                print(q_values.argmax(dim=1).cpu().numpy().item())
-                action_seperated[i] = q_values.argmax(dim=1).cpu().numpy().item()
-            print(action_seperated)
-            """
+
         random_actions = self.envs.action_space.sample()
         explore_mask = np.random.random(self.num_envs) < epsilon
 
         actions = np.where(explore_mask, random_actions, greedy_actions)
         return actions
-
 
 class epsilonDecay():
     def __init__(self, epsilon_initial = 1, epsilon_final = 0.1, epsilon_decay_Start = 25000,epsilon_decay_End = 200000):

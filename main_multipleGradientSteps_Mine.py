@@ -39,27 +39,20 @@ replayBuffer = BufferVectorized.ReplayBuffer(
 
 # initialize Deep Network
 online_network = Networks.DQN(config.FrameBufferSize, action_space_size).to(device)
-# load old weights
-#path = Path(config.saveDir) / "modelWeights" / "model.pth"
-#Network_Prediction.load_state_dict(torch.load(path, weights_only=True))
 network_Target = Networks.DQN(config.FrameBufferSize, action_space_size).to(device)
 network_Target.load_state_dict(online_network.state_dict())
 
 criterion = torch.nn.SmoothL1Loss() # Human-level control through deep reinforcement learning
-
 optim = torch.optim.Adam(online_network.parameters(), lr=config.learning_rate)
 
 # init agents
 agents = agent.agents(envs)
 epsilon = agent.epsilonDecay(config.epsilon_initial, config.epsilon_final, config.epsilon_decay_Start,config.epsilon_decay_End)
 
-
-
-
 # Training
 # -------------------------------------------------------------
 # metrics
-Scores = Utilities.Scores(numberEnvs=config.numberEnvs)
+Scores = Utilities.Scores(rewardsDequeSize=250,numberEnvs=config.numberEnvs)
 writer = SummaryWriter()
 
 
@@ -70,7 +63,6 @@ writer.add_text("Hyperparameter", result, global_step=0)
 for f in range(0,config.maximumFrames):
     # Agent -- choose action
     actions = agents.select_actions( epsilon.get_epsilon(f), online_network, device, frameBuffers, config.numberEnvs,f)
-
 
     # save current  state
     states = frameBuffers.return_stack()
@@ -91,12 +83,15 @@ for f in range(0,config.maximumFrames):
                          next_stack[envID], terminateds[envID])
     prev_dones = dones
     # score vector
-    Scores.addScore(rewards)
-    Scores.AddTotalScoreAgent(dones,rewards)
+    Scores.addRewardsDeque(rewards)
+    Scores.addEpisodeScoreAgent(dones,rewards,doPrint=False)
+    Scores.addEpisodeLengthBuffer(dones)
+
 
     # train network
     _loss = 0
     _predicted_q = 0
+    _td_errors = 0
 
     if replayBuffer.filled() and replayBuffer.currentSize > config.warmupiteration:
         for env in range(config.numberEnvs):
@@ -108,19 +103,17 @@ for f in range(0,config.maximumFrames):
             actions = Buffer["actions"].view(-1, 1).to(device)
             dones = Buffer["dones"].view(-1).float().to(device)
 
-
+            # DQN
             if not config.doDoubleDQN:
                 with torch.no_grad():
-                    # target
                     Y = rewards
                     Y += config.discount_factor * network_Target(next_state_input).max(dim=1).values * (1-dones)
-
+            # double DQN
             else:
                 with torch.no_grad():
                     Y = rewards
                     max_a = online_network(next_state_input).argmax(dim=1).unsqueeze(1)
                     Y += config.discount_factor * network_Target(next_state_input).gather(1,max_a).squeeze(1) * (1 - dones)
-
 
             Q = online_network(state_input).gather(1, actions).view(-1)
             loss = criterion( Y, Q)
@@ -131,16 +124,20 @@ for f in range(0,config.maximumFrames):
 
 
             # for data collection
-            _loss += loss.detach()
+            _loss += loss.mean().detach()
             _predicted_q += Q.mean().detach()
+            _td_errors = (Y - Q).mean().detach()
+
 
         # save data
-        writer.add_scalar('loss', float(_loss)/config.numberEnvs, f)
+        writer.add_scalar('loss', _loss, f)
         writer.add_scalar('epsilson', epsilon.get_epsilon(f), f)
-        writer.add_scalar('AverageQValues', float(_predicted_q)/config.numberEnvs, f)
-        writer.add_scalar('averageScoreRatio', Scores.ReturnAverageScores()["agent"], f)
-        writer.add_scalar('averageScoreAgent', Scores.GetAverageTotalScores(config.numberEnvs), f)
-        writer.add_scalar('updateTargetNetwork', 0, f)
+        writer.add_scalar("Td error", _td_errors ,f)
+        writer.add_scalar('Average QValues', float(_predicted_q)/config.numberEnvs, f)
+        writer.add_scalar('Average ScoreRatio', Scores.ReturnAverageRewards()["agent"], f)
+        writer.add_scalar('Get EpisodeAgent Score', Scores.GetEpisodeAgent(), f)
+        writer.add_scalar("Average EpisodeLength", Scores.returnEpisodeLength(),f)
+
         ## for later
         #writer.add_image('four_fashion_mnist_images', img_grid)
         # append to tensorboard
@@ -149,7 +146,7 @@ for f in range(0,config.maximumFrames):
         if f % 5000==0:
             print("current iteration: {0} ".format( f  ) )
             print("  - epsilon: {0}".format(epsilon.get_epsilon(f)))
-            print("  - average score ration agent/computer: {0}".format(Scores.ReturnAverageScores()["agent"]))
+            print("  - average score ration agent/computer: {0}".format(Scores.ReturnAverageRewards()["agent"]))
             print("  - replayBuffer Size: {0}".format(replayBuffer.currentSize))
 
         # update target net
@@ -167,24 +164,5 @@ for f in range(0,config.maximumFrames):
                 network=online_network, saveDir=config.saveDir, iteration=f
             )
 
-
-
-
-    """ 
-    # save scores
-    if f % 20 == 0 :
-        Data.appendAverageScores()
-    # print
-    if f % 1000 == 0 and f > 1:
-        print("current iteration: {0} with epsilon {1}".format( f ,  epsilon.get_epsilon(f)) )
-        print("")
-        Data.PrintAverageScores()
-        Data.PrintAverageLosses(50)
-        Data.PrintAverageQvalues(50)
-        Data.PrintAverageTDerror(50)
-        print("replay current size: {0}".format(replayBuffer.currentSize) )
-        print("-------------------------------------")
-    # save files
-    """
 
 

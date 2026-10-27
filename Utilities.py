@@ -22,63 +22,79 @@ def lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * t
 
 class Scores:
-    def __init__(self, scoresDequeSize=1000, numberEnvs=4):
-        self.scoresDeque = {}
-        self.scoresDeque["agent"] = Deque(maxlen=scoresDequeSize)
-        self.scoresDeque["computer"] = Deque(maxlen=scoresDequeSize)
+    def __init__(self, rewardsDequeSize=1000, numberEnvs=4):
+        self.rewardsDeque = {}
+        self.rewardsDeque["agent"] = Deque(maxlen=rewardsDequeSize)
+        self.rewardsDeque["computer"] = Deque(maxlen=rewardsDequeSize)
+        self.rewardsDequeSize = rewardsDequeSize
 
-        self.totalEpisodeScores = [] # collect
-        self.EpisodeScoresBuffer = [0 for _ in range(numberEnvs)] # collect scores during epiosde per Env
-    def addScore(self, rewards ):
+        # per episode aget
+        self.episodeScoresAgentBuffer = [0  for _ in range(numberEnvs)]
+        self.totalEpisodeScoreAgent = [] # collect
+
+        # length per episode
+        self.episodeLengthBuffer = [0  for _ in range(numberEnvs)]
+        self.episodeLengths = []
+
+
+    # for average scores
+    def addRewardsDeque(self, rewards ):
         # score vector
         for i,reward in enumerate(rewards):
             if reward != 0:
                 if reward == 1:
-                    self.scoresDeque["agent"].append(1)
-                    self.scoresDeque["computer"].append(0)
+                    self.rewardsDeque["agent"].append(1)
+                    self.rewardsDeque["computer"].append(0)
                 else:
-                    self.scoresDeque["agent"].append(0)
-                    self.scoresDeque["computer"].append(1)
-    def ReturnAverageScores(self):
+                    self.rewardsDeque["agent"].append(0)
+                    self.rewardsDeque["computer"].append(1)
 
-        if len(self.scoresDeque["agent"]) >10:
-            AgentScores = statistics.mean(self.scoresDeque["agent"])
-            ComputerScores = statistics.mean(self.scoresDeque["computer"])
+    def ReturnAverageRewards(self):
+        if len(self.rewardsDeque["agent"]) >= self.rewardsDequeSize:
+            AgentScores = statistics.mean(self.rewardsDeque["agent"])
+            ComputerScores = statistics.mean(self.rewardsDeque["computer"])
             return {"agent": AgentScores, "computer": ComputerScores}
-
         else:
-            return {"agent": 0, "computer": 0}
+            return {"agent": -1, "computer": -1}
 
-    def AddTotalScoreAgent(self, dones, rewards, doPrint=False):
+
+    # for Scores per episode
+    def addEpisodeScoreAgent(self, dones, rewards, doPrint=False):
+        # add reward to rewards buffer when agent scores
         indicesReward = np.where(rewards == 1)[0]
-        #if len(indicesReward) > 0: print(indicesReward)
         for i in indicesReward:
-            self.EpisodeScoresBuffer[i] += 1
+            self.episodeScoresAgentBuffer[i] += 1
 
+        # when episodes are done
         indicesDones = np.where(dones == 1)[0]
         if len(indicesDones) > 0:
             for i in indicesDones:
-                self.totalEpisodeScores.append( self.EpisodeScoresBuffer[i])
-                # reset buffer
-                self.EpisodeScoresBuffer[i] = 0
+                self.totalEpisodeScoreAgent.append( self.episodeScoresAgentBuffer[i])
                 if doPrint:
-                    print("agent score in Env: {0} is {0} !".format(i, rewards[indicesDones]) )
+                    print("agent scored {1} points in Env: {0} !".format(i, self.episodeScoresAgentBuffer[i]) )
+                # reset buffer
+                self.episodeScoresAgentBuffer[i] = 0
 
-
-    def GetAverageTotalScores(self, maxLength=20):
-        totalScore = 0
-        counter = 0
-        for i,score in enumerate(self.totalEpisodeScores):
-            totalScore += score
-            counter += 1
-            if i > maxLength:
-                break
-        if counter >= 1:
-            return float(totalScore) / float(counter)
+    def GetEpisodeAgent(self):
+        if len(self.totalEpisodeScoreAgent):
+            return self.totalEpisodeScoreAgent[-1]
         else:
-            return 0
+            return -1
 
 
+    def addEpisodeLengthBuffer(self,dones):
+        for i,state in enumerate(dones):
+            if state:
+                self.episodeLengths.append(self.episodeLengthBuffer[i])
+                self.episodeLengthBuffer[i] = 0;
+            else:
+                self.episodeLengthBuffer[i] += 1;
+
+    def returnEpisodeLength(self, maxLength=8):
+        if len(self.episodeLengths) >= maxLength:
+            return statistics.mean(self.episodeLengths)
+        else:
+            return -1
 
 
 def get_clean_hparams(module_or_dict):

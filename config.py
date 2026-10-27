@@ -15,9 +15,9 @@ target_network_update_freq = 5000
 
 # epsilon behaviour
 epsilon_initial = 1
-epsilon_final = 0.05
+epsilon_final = 0.125
 epsilon_decay_Start = 10000
-epsilon_decay_End = 800000
+epsilon_decay_End = 2000000
 
 warmupiteration = 5000
 
