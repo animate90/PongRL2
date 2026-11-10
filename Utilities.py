@@ -49,14 +49,13 @@ class Scores:
                     self.rewardsDeque["agent"].append(0)
                     self.rewardsDeque["computer"].append(1)
 
-    def ReturnAverageRewards(self):
+    def AverageScoreRatio(self):
         if len(self.rewardsDeque["agent"]) >= self.rewardsDequeSize:
             AgentScores = statistics.mean(self.rewardsDeque["agent"])
-            ComputerScores = statistics.mean(self.rewardsDeque["computer"])
-            return {"agent": AgentScores, "computer": ComputerScores}
+            #ComputerScores = statistics.mean(self.rewardsDeque["computer"])
+            return AgentScores
         else:
-            return {"agent": -1, "computer": -1}
-
+            return None
 
     # for Scores per episode
     def addEpisodeScoreAgent(self, dones, rewards, doPrint=False):
@@ -80,6 +79,16 @@ class Scores:
             return self.totalEpisodeScoreAgent[-1]
         else:
             return -1
+
+    def GetEpisodeAgentsWinAverage(self, avergeSize=10):
+        if len(self.totalEpisodeScoreAgent) > avergeSize:
+            npa = np.asarray(self.totalEpisodeScoreAgent, dtype=np.int8)
+            npa = npa[-avergeSize:]
+            wins = float(np.count_nonzero(npa == 21))
+            return wins / avergeSize
+        else:
+            return 0
+
 
 
     def addEpisodeLengthBuffer(self,dones):

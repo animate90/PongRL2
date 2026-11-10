@@ -17,7 +17,6 @@ class FrameBuffer(object):
         frame = cv2.cvtColor(input_frame, cv2.COLOR_RGB2GRAY)  # to grea
         frame = frame[30:,:] # crop scores
         frame = cv2.resize(frame, (84, 84), interpolation=cv2.INTER_AREA) # resize
-        #frame = frame.astype(np.float32) / 255.0
         frame = frame.astype(np.uint8)
         return frame
 

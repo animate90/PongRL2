@@ -134,19 +134,23 @@ for f in range(0,config.maximumFrames):
         writer.add_scalar('epsilson', epsilon.get_epsilon(f), f)
         writer.add_scalar("Td error", _td_errors ,f)
         writer.add_scalar('Average QValues', float(_predicted_q)/config.numberEnvs, f)
-        writer.add_scalar('Average ScoreRatio', Scores.ReturnAverageRewards()["agent"], f)
+        if Scores.AverageScoreRatio() is not None:
+            writer.add_scalar('Average ScoreRatio', Scores.AverageScoreRatio(), f)
         writer.add_scalar('Get EpisodeAgent Score', Scores.GetEpisodeAgent(), f)
+        writer.add_scalar("Episode Agents Wins (Average)", Scores.GetEpisodeAgentsWinAverage(),f)
         writer.add_scalar("Average EpisodeLength", Scores.returnEpisodeLength(),f)
 
+
+
         ## for later
-        #writer.add_image('four_fashion_mnist_images', img_grid)
         # append to tensorboard
         if f % 100 ==0:
             writer.flush()
         if f % 5000==0:
             print("current iteration: {0} ".format( f  ) )
             print("  - epsilon: {0}".format(epsilon.get_epsilon(f)))
-            print("  - average score ration agent/computer: {0}".format(Scores.ReturnAverageRewards()["agent"]))
+            if Scores.AverageScoreRatio() is not None:
+                print("  - average score ration agent/computer: {0}".format(Scores.AverageScoreRatio()))
             print("  - replayBuffer Size: {0}".format(replayBuffer.currentSize))
 
         # update target net
@@ -155,11 +159,13 @@ for f in range(0,config.maximumFrames):
             print("  - update target network !!")
             network_Target.load_state_dict(online_network.state_dict())
             writer.add_scalar('updateTargetNetwork', 1, f)
+        else:
+            writer.add_scalar('updateTargetNetwork', 0, f)
         # replay buffer and netopw
-        if f % 50000 == 0 and f > 1:
+        if f % 5000 == 0 and f > 1:
             print("current iteration: {0} ".format( f  ) )
             print("  - saving replay buffer and model")
-            replayBuffer.save_buffer(config.saveDir,  name = "replayBuffer_single")
+            #replayBuffer.save_buffer(config.saveDir,  name = "replayBuffer_single")
             Networks.saveNetwork(
                 network=online_network, saveDir=config.saveDir, iteration=f
             )

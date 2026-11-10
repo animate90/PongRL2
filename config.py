@@ -1,24 +1,24 @@
 import torch
 
-numberEnvs = 8
-
-FrameBufferSize = 4
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-batch_size = 128
 
-replayBufferCapacity = 300000
+
+
+numberEnvs = 4 # number of virtual environments
+FrameBufferSize = 1 # size of the state Stack
+replayBufferCapacity = 800000 # max size of #300000 # tst with 50000 and 800000 for fun
 
 # learning hyper paremater
 learning_rate = 0.00025
 discount_factor = 0.99
-target_network_update_freq = 5000
+target_network_update_freq = 500
+batch_size = 128 # batch size for each training iteration
 
 # epsilon behaviour
 epsilon_initial = 1
 epsilon_final = 0.125
 epsilon_decay_Start = 10000
-epsilon_decay_End = 2000000
-
+epsilon_decay_End = 200000
 warmupiteration = 5000
 
 maximumFrames = 1000000
@@ -28,3 +28,7 @@ doDoubleDQN = True
 # data collection parameter
 saveDir = 'D:/PongRL2'
 
+# 100000   17-08-38  done
+# 100000   22-49-49
+# 200000   08-17-12  done
+# 300000
