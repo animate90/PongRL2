@@ -111,9 +111,8 @@ for f in range(0,config.maximumFrames):
             # double DQN
             else:
                 with torch.no_grad():
-                    Y = rewards
                     max_a = online_network(next_state_input).argmax(dim=1).unsqueeze(1)
-                    Y += config.discount_factor * network_Target(next_state_input).gather(1,max_a).squeeze(1) * (1 - dones)
+                    Y = rewards + config.discount_factor * network_Target(next_state_input).gather(1,max_a).squeeze(1) * (1 - dones)
 
             Q = online_network(state_input).gather(1, actions).view(-1)
             loss = criterion( Y, Q)
@@ -129,7 +128,7 @@ for f in range(0,config.maximumFrames):
             _td_errors = (Y - Q).mean().detach()
 
 
-        # save data
+        # save data to tensorboard
         writer.add_scalar('loss', _loss, f)
         writer.add_scalar('epsilson', epsilon.get_epsilon(f), f)
         writer.add_scalar("Td error", _td_errors ,f)
@@ -141,8 +140,6 @@ for f in range(0,config.maximumFrames):
         writer.add_scalar("Average EpisodeLength", Scores.returnEpisodeLength(),f)
 
 
-
-        ## for later
         # append to tensorboard
         if f % 100 ==0:
             writer.flush()
@@ -155,8 +152,8 @@ for f in range(0,config.maximumFrames):
 
         # update target net
         if f % config.target_network_update_freq == 0:
-            print("current iteration: {0} ".format( f  ) )
-            print("  - update target network !!")
+            #print("current iteration: {0} ".format( f  ) )
+            #print("  - update target network !!")
             network_Target.load_state_dict(online_network.state_dict())
             writer.add_scalar('updateTargetNetwork', 1, f)
         else:

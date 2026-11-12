@@ -42,9 +42,7 @@ class epsilonDecay():
         min_out = self.epsilon_initial
         max_out = self.epsilon_final
         t_clamped = max(min(iteration, max_in), min_in)
-        rampUnclamped =  min_out + (iteration - min_in) * (max_out - min_out) / (max_in - min_in)
         rampClamped =  min_out + (t_clamped - min_in) * (max_out - min_out) / (max_in - min_in)
-
         return rampClamped
 
 
