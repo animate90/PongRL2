@@ -20,7 +20,9 @@ import agent
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # 1. Create our training environmentS
-envs = gym.vector.SyncVectorEnv([AtariEnv.make_env(i) for i in range(config.numberEnvs)])
+envs = gym.vector.SyncVectorEnv(
+    [AtariEnv.make_env(i) for i in range(config.numberEnvs)]
+)
 action_space_size = envs.action_space.nvec[0]
 
 # 2. initilize Buffers

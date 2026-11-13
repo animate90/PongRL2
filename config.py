@@ -11,7 +11,7 @@ replayBufferCapacity = 800000 # max size of #300000 # tst with 50000 and 800000 
 # learning hyper paremater
 learning_rate = 0.00025
 discount_factor = 0.99
-target_network_update_freq = 5  # 500 standart  test 5 and 50000
+target_network_update_freq = 5000  # 500 standart  test 5 and 50000
 batch_size = 128 # batch size for each training iteration
 
 # epsilon behaviour

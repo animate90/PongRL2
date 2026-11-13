@@ -13,7 +13,11 @@ class agents:
         self.epsilon = 1.0
         self.envs = envs
 
-    def select_actions(self,epsilon : float, network_Prediction : Networks.DQN ,device, frameBuffers : BufferVectorized.FrameBuffer, num_envs: int, currentFrame =0 ):
+    def select_actions(self,epsilon : float,
+                       network_Prediction : Networks.DQN,
+                       device, frameBuffers : BufferVectorized.FrameBuffer,
+                       num_envs: int
+                       ):
         self.epsilon = epsilon
         self.num_envs = num_envs
 
