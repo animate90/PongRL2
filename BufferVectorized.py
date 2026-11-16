@@ -12,7 +12,9 @@ class FrameBuffer(object):
     def __init__(self, numberEnvs=2, frameBufferSize=4):
         self.numberEnvs = numberEnvs
         self.frameBufferSize = frameBufferSize
-        self.frames = [deque(maxlen=frameBufferSize) for _ in range(numberEnvs)]
+        self.frames = [
+            deque(maxlen=frameBufferSize) for _ in range(numberEnvs)
+        ]
 
     def preprocess_frame_single(self, input_frame):
         frame = cv2.cvtColor(input_frame, cv2.COLOR_RGB2GRAY)  # to grea

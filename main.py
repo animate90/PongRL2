@@ -20,7 +20,7 @@ config.warmupiteration = int(config.warmupiteration / config.numberEnvs)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# 1. Create our training environmentS
+# 1. Create our training environments
 envs = gym.vector.SyncVectorEnv(
     [AtariEnv.make_env(i) for i in range(config.numberEnvs)]
 )
@@ -48,7 +48,7 @@ target_network.load_state_dict(online_network.state_dict())
 
 criterion = (
     torch.nn.SmoothL1Loss()
-)  # Human-level control through deep reinforcement learning
+)
 optim = torch.optim.Adam(online_network.parameters(), lr=config.learning_rate)
 
 # init agents

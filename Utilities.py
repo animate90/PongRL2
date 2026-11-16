@@ -108,7 +108,6 @@ class Scores:
 
 
 def get_clean_hparams(module_or_dict):
-    """Extracts non-dunder variables and keeps only float, int, or bool types."""
     source = (
         vars(module_or_dict) if not isinstance(module_or_dict, dict) else module_or_dict
     )

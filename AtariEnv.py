@@ -7,7 +7,7 @@ gym.register_envs(ale_py)
 class PongActionWrapper(gym.ActionWrapper):
     def __init__(self, env):
         super().__init__(env)
-        # actions: 0: NOOP, 2: RIGHT (UP), 3: LEFT (DOWN)
+        # actions: 1: Fire, 2: RIGHT (UP), 3: LEFT (DOWN)
         self.action_mapping = [1, 2, 3]
         self.action_space = gym.spaces.Discrete(len(self.action_mapping))
 
@@ -22,5 +22,4 @@ def make_env(seed):
         env = PongActionWrapper(env)
         env.action_space.seed(seed)
         return env
-
     return thunk
