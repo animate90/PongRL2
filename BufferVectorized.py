@@ -20,7 +20,7 @@ class FrameBuffer(object):
         frame = cv2.resize(frame, (84, 84), interpolation=cv2.INTER_AREA)
         frame = frame.astype(np.uint8)
 
-        # remap grey values
+        # remap grey values to range 0-1
         minIn, maxIn = 87, 147
         lut = np.clip(
             (np.arange(256) - minIn) * (255.0 / (maxIn - minIn)), 0, 255
@@ -35,7 +35,6 @@ class FrameBuffer(object):
             self.frames[EnvIndex].append(frame)
 
     def addFrameSingleEnv(self, env, input_frame):
-
         frame = self.preprocess_frame_single(input_frame)
         self.frames[env].append(frame)
 
@@ -49,9 +48,10 @@ class FrameBuffer(object):
         return torch.from_numpy(stack).to(dtype=torch.uint8)
 
     def filled(self):
-        # make it fail save to go through each env
         return self.frameBufferSize == len(self.frames[0])
 
+
+    # for visualization
     def display_stack(self, envIndex=0):
         stack = self.return_stack()[envIndex]
         plt.imshow(torch.hstack([x.squeeze() for x in stack.split(1)]), cmap="gray")
