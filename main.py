@@ -10,7 +10,7 @@ import Networks
 import AtariEnv
 import agent
 
-# adjust for vectorized envs
+# adjustment for vectorized envs
 config.epsilon_decay_Start = int(config.epsilon_decay_Start / config.numberEnvs)
 config.epsilon_decay_End = int(config.epsilon_decay_End / config.numberEnvs)
 config.target_network_update_freq = int(
