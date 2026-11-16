@@ -21,6 +21,7 @@ def plotState(state):
 def lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * t
 
+
 class Scores:
     def __init__(self, rewardsDequeSize=1000, numberEnvs=4):
         self.rewardsDeque = {}
@@ -28,19 +29,18 @@ class Scores:
         self.rewardsDeque["computer"] = Deque(maxlen=rewardsDequeSize)
         self.rewardsDequeSize = rewardsDequeSize
 
-        # per episode aget
-        self.episodeScoresAgentBuffer = [0  for _ in range(numberEnvs)]
-        self.totalEpisodeScoreAgent = [] # collect
+        # per episode agent
+        self.episodeScoresAgentBuffer = [0 for _ in range(numberEnvs)]
+        self.totalEpisodeScoreAgent = []  # collect
 
         # length per episode
-        self.episodeLengthBuffer = [0  for _ in range(numberEnvs)]
+        self.episodeLengthBuffer = [0 for _ in range(numberEnvs)]
         self.episodeLengths = []
 
-
     # for average scores
-    def addRewardsDeque(self, rewards ):
+    def addRewardsDeque(self, rewards):
         # score vector
-        for i,reward in enumerate(rewards):
+        for i, reward in enumerate(rewards):
             if reward != 0:
                 if reward == 1:
                     self.rewardsDeque["agent"].append(1)
@@ -52,7 +52,6 @@ class Scores:
     def AverageScoreRatio(self):
         if len(self.rewardsDeque["agent"]) >= self.rewardsDequeSize:
             AgentScores = statistics.mean(self.rewardsDeque["agent"])
-            #ComputerScores = statistics.mean(self.rewardsDeque["computer"])
             return AgentScores
         else:
             return None
@@ -68,9 +67,13 @@ class Scores:
         indicesDones = np.where(dones == 1)[0]
         if len(indicesDones) > 0:
             for i in indicesDones:
-                self.totalEpisodeScoreAgent.append( self.episodeScoresAgentBuffer[i])
+                self.totalEpisodeScoreAgent.append(self.episodeScoresAgentBuffer[i])
                 if doPrint:
-                    print("agent scored {1} points in Env: {0} !".format(i, self.episodeScoresAgentBuffer[i]) )
+                    print(
+                        "agent scored {1} points in Env: {0} !".format(
+                            i, self.episodeScoresAgentBuffer[i]
+                        )
+                    )
                 # reset buffer
                 self.episodeScoresAgentBuffer[i] = 0
 
@@ -89,15 +92,13 @@ class Scores:
         else:
             return 0
 
-
-
-    def addEpisodeLengthBuffer(self,dones):
-        for i,state in enumerate(dones):
+    def addEpisodeLengthBuffer(self, dones):
+        for i, state in enumerate(dones):
             if state:
                 self.episodeLengths.append(self.episodeLengthBuffer[i])
-                self.episodeLengthBuffer[i] = 0;
+                self.episodeLengthBuffer[i] = 0
             else:
-                self.episodeLengthBuffer[i] += 1;
+                self.episodeLengthBuffer[i] += 1
 
     def returnEpisodeLength(self, maxLength=8):
         if len(self.episodeLengths) >= maxLength:
@@ -109,9 +110,7 @@ class Scores:
 def get_clean_hparams(module_or_dict):
     """Extracts non-dunder variables and keeps only float, int, or bool types."""
     source = (
-        vars(module_or_dict)
-        if not isinstance(module_or_dict, dict)
-        else module_or_dict
+        vars(module_or_dict) if not isinstance(module_or_dict, dict) else module_or_dict
     )
 
     # Inner helper function to validate allowed types
@@ -131,4 +130,3 @@ def get_clean_hparams(module_or_dict):
     }
 
     return filtered
-

@@ -18,23 +18,9 @@ class PongActionWrapper(gym.ActionWrapper):
 
 def make_env(seed):
     def thunk():
-        env = gym.make('ALE/Pong-v5', frameskip=4)
+        env = gym.make("ALE/Pong-v5", frameskip=4)
         env = PongActionWrapper(env)
         env.action_space.seed(seed)
         return env
-    return thunk
 
-"""
-def make_env(seed):
-    def thunk():
-        #with RGB
-        render_mode = "human" if seed == 0 else None
-        #env = gym.make('ALE/Pong-v5',frameskip=4,render_mode=render_mode)
-
-        env = gym.make('ALE/Pong-v5', frameskip=4)
-        # Apply the wrapper here
-        env = PongActionWrapper(env)
-        env.action_space.seed(seed)
-        return env
     return thunk
-"""

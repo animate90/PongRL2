@@ -1,8 +1,9 @@
 from torch import nn
 from pathlib import Path
 
-#from torch import save
+# from torch import save
 import torch
+
 
 class DQN(nn.Module):
     def __init__(self, frameBufferSize=4, actionSpaceSize=6):
@@ -10,17 +11,18 @@ class DQN(nn.Module):
         self.frameBufferSize = frameBufferSize
         super(DQN, self).__init__()
         self.model = nn.Sequential(
-            nn.Conv2d(self.frameBufferSize,32,8,4),
+            nn.Conv2d(self.frameBufferSize, 32, 8, 4),
             nn.ReLU(),
-            nn.Conv2d(32,64,4,2),
+            nn.Conv2d(32, 64, 4, 2),
             nn.ReLU(),
-            nn.Conv2d(64,64,3,1),
+            nn.Conv2d(64, 64, 3, 1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(3136,512),
+            nn.Linear(3136, 512),
             nn.ReLU(),
-            nn.Linear(512,self.actionSpaceSize)
+            nn.Linear(512, self.actionSpaceSize),
         )
+
     def forward(self, x):
         return self.model(x)
 
@@ -32,9 +34,6 @@ def saveNetwork(network, saveDir, filename="model", iteration=None):
     if iteration == None:
         path = path / (filename + ".pth")
     else:
-        path = path / (filename + "__" + str(iteration) + ".pth" )
+        path = path / (filename + "__" + str(iteration) + ".pth")
 
-    torch.save(network.state_dict(), path )
-
-def loadNetwork(saveDir, filename="model", iteration=None):
-    print("not implemented")
+    torch.save(network.state_dict(), path)

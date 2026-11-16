@@ -1,21 +1,22 @@
-import numpy as np
-
-
 import gymnasium as gym
 
-
-from pathlib import Path
-
-import pickle
-
 import torch
-
+from torch.utils.tensorboard import SummaryWriter
+import numpy as np
 import Utilities
 import BufferVectorized
 import config
 import Networks
 import AtariEnv
 import agent
+
+# adjust for vectorized envs
+config.epsilon_decay_Start = int(config.epsilon_decay_Start / config.numberEnvs)
+config.epsilon_decay_End = int(config.epsilon_decay_End / config.numberEnvs)
+config.target_network_update_freq = int(
+    config.target_network_update_freq / config.numberEnvs
+)
+config.warmupiteration = int(config.warmupiteration / config.numberEnvs)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -24,147 +25,167 @@ envs = gym.vector.SyncVectorEnv(
     [AtariEnv.make_env(i) for i in range(config.numberEnvs)]
 )
 action_space_size = envs.action_space.nvec[0]
+initial_obs, infos = envs.reset(seed=[100 + i for i in range(config.numberEnvs)])
 
-# 2. initilize Buffers
-frameBuffers = BufferVectorized.FrameBuffer(config.numberEnvs , config.FrameBufferSize)
+# initilize Buffers
+frameBuffers = BufferVectorized.FrameBuffer(config.numberEnvs, config.FrameBufferSize)
+# prime buffer
+for _ in range(config.FrameBufferSize):
+    frameBuffers.addFrames(initial_obs)
+
+prev_dones = np.zeros(config.numberEnvs, dtype=bool)
 
 replayBuffer = BufferVectorized.ReplayBuffer(
     capacity=config.replayBufferCapacity,
     frameBufferSize=config.FrameBufferSize,
-    batch_size=config.batch_size
+    batch_size=config.batch_size,
 )
 
-# 3. initialize Deep Network
-Network_Prediction = Networks.DQN(config.FrameBufferSize, action_space_size).to(device)
+# initialize Deep Network
+online_network = Networks.DQN(config.FrameBufferSize, action_space_size).to(device)
+target_network = Networks.DQN(config.FrameBufferSize, action_space_size).to(device)
+target_network.load_state_dict(online_network.state_dict())
 
-# load old weights
-#path = Path(config.saveDir) / "modelWeights" / "model.pth"
-#Network_Prediction.load_state_dict(torch.load(path, weights_only=True))
-
-Network_Target = Networks.DQN(config.FrameBufferSize, action_space_size).to(device)
-Network_Target.load_state_dict(Network_Prediction.state_dict())
-
-criterion = torch.nn.MSELoss()
-optim = torch.optim.Adam(Network_Prediction.parameters(), lr=2e-4)
+criterion = (
+    torch.nn.SmoothL1Loss()
+)  # Human-level control through deep reinforcement learning
+optim = torch.optim.Adam(online_network.parameters(), lr=config.learning_rate)
 
 # init agents
 agents = agent.agents(envs)
+epsilon = agent.epsilonDecay(
+    config.epsilon_initial,
+    config.epsilon_final,
+    config.epsilon_decay_Start,
+    config.epsilon_decay_End,
+)
 
 # Training
 # -------------------------------------------------------------
+# metrics
+Scores = Utilities.Scores(rewardsDequeSize=250, numberEnvs=config.numberEnvs)
+writer = SummaryWriter()
 
 
-states, infos = envs.reset(seed=[100 + i for i in range(config.numberEnvs)])
+hparams = Utilities.get_clean_hparams(config)
+result = "\n".join(f"{k}: {v}" for k, v in hparams.items())
+writer.add_text("Hyperparameter", result, global_step=0)
 
-
-#scores = Utilities.scoreKeeper(config.numberEnvs)
-
-Data = Utilities.CollectData()
-
-# adjust for vectoritdev env
-newRange = float( config.final_exploration_iteration / config.numberEnvs )
-
-
-for f in range(int(newRange)):
-    # save state
-    if frameBuffers.filled():
-        states = frameBuffers.return_stack()
-
+for f in range(0, config.maximumFrames):
     # Agent -- choose action
-    epsilon = Utilities.lerp(config.initial_epsilon, config.final_epsilon, f/ newRange)
-    actions = agents.select_actions(epsilon, Network_Prediction, device, frameBuffers)
+    actions = agents.select_actions(
+        epsilon.get_epsilon(f), online_network, device, frameBuffers, config.numberEnvs
+    )
 
-    next_states, rewards, truncateds, terminateds, infos = envs.step(actions)
+    # save current  state
+    states = frameBuffers.return_stack()
+    # move to next state
+    next_obs, rewards, terminateds, truncateds, infos = envs.step(actions)
     dones = np.logical_or(terminateds, truncateds)
-
     # add next state to frame buffer
-    frameBuffers.addFrames(next_states)
+    frameBuffers.addFrames(next_obs)
+    next_stack = frameBuffers.return_stack()
 
-    # Add to replay buffer
-    if infos["episode_frame_number"][0] > 50:
-        for envID in range(config.numberEnvs):
-            replayBuffer.add(
-                state= states[envID],
-                action=actions[envID],
-                reward=rewards[envID],
-                next_state= frameBuffers.return_stack()[envID],
-                done=terminateds[envID]
-            )
-
+    for envID in range(config.numberEnvs):
+        if prev_dones[envID]:
+            # this step was the autoreset: next_obs is the first frame of a new episode
+            for _ in range(config.FrameBufferSize):
+                frameBuffers.addFrameSingleEnv(envID, next_obs[envID])
+            continue  # don't store this transition
+        replayBuffer.add(
+            states[envID],
+            actions[envID],
+            rewards[envID],
+            next_stack[envID],
+            terminateds[envID],
+        )
+    prev_dones = dones
     # score vector
-    Data.addScore(rewards)
+    Scores.addRewardsDeque(rewards)
+    Scores.addEpisodeScoreAgent(dones, rewards, doPrint=False)
+    Scores.addEpisodeLengthBuffer(dones)
 
     # train network
-    if replayBuffer.filled():
-        # gradient descent for each env
-        for step in range(config.numberEnvs):
+    _loss = 0
+    _predicted_q = 0
+    _td_errors = 0
+
+    if replayBuffer.filled() and replayBuffer.currentSize > config.warmupiteration:
+        for env in range(config.numberEnvs):
+            # sample random Mni batches
             Buffer = replayBuffer.sample()
-            states = Buffer["states"]
-            next_states = Buffer["next_states"]
-            rewards = Buffer["rewards"]
-            actions = Buffer["actions"]
-            dones = Buffer["dones"]
+            state_input = Buffer["states"].float().div(255).to(device)
+            next_state_input = Buffer["next_states"].float().div(255).to(device)
+            rewards = Buffer["rewards"].view(-1)
+            actions = Buffer["actions"].view(-1, 1).to(device)
+            dones = Buffer["dones"].view(-1).float().to(device)
 
-            Network_Prediction.zero_grad()
+            # DQN
+            if not config.doDoubleDQN:
+                with torch.no_grad():
+                    Y = rewards
+                    Y += (
+                        config.discount_factor
+                        * target_network(next_state_input).max(dim=1).values
+                        * (1 - dones)
+                    )
+            # double DQN
+            else:
+                with torch.no_grad():
+                    max_a = online_network(next_state_input).argmax(dim=1).unsqueeze(1)
+                    Y = rewards + config.discount_factor * target_network(
+                        next_state_input
+                    ).gather(1, max_a).squeeze(1) * (1 - dones)
 
-            # Current Q-values
-            predicted_q = Network_Prediction(states.float().div(255)).gather(1, actions.unsqueeze(1)).squeeze(1)
-
-            # DQN Target
-            with torch.no_grad():
-                best_actions = Network_Prediction(next_states.float().div(255)).argmax(dim=1, keepdim=True)
-                next_q = Network_Target(next_states.float().div(255)).gather(1, best_actions).squeeze(1)
-                target_q = rewards + (config.discount_factor * next_q * (1.0 - dones.float()))
-
-                # td error
-                td_error = target_q - predicted_q
-                Data.addTDError( float(td_error.mean() ))
-
-            loss = criterion(predicted_q, target_q)
-
+            Y_hat = online_network(state_input).gather(1, actions).view(-1)
+            loss = criterion(Y, Y_hat)
             optim.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(online_network.parameters(), max_norm=10.0)
             optim.step()
 
-            # save data
-            Data.addLosses(loss.item())
-            Data.addAverageQValues(predicted_q.mean().item())
-            Data.addEpsilon(epsilon)
+            # for data collection
+            _loss += loss.mean().detach()
+            _predicted_q += Y_hat.mean().detach()
+            _td_errors = (Y - Y_hat).mean().detach()
+
+        # save data to tensorboard
+        writer.add_scalar("loss", _loss, f)
+        writer.add_scalar("epsilson", epsilon.get_epsilon(f), f)
+        writer.add_scalar("Td error", _td_errors, f)
+        writer.add_scalar("Average QValues", float(_predicted_q) / config.numberEnvs, f)
+        if Scores.AverageScoreRatio() is not None:
+            writer.add_scalar("Average ScoreRatio", Scores.AverageScoreRatio(), f)
+        writer.add_scalar("Get EpisodeAgent Score", Scores.GetEpisodeAgent(), f)
+        writer.add_scalar(
+            "Episode Agents Wins (Average)", Scores.GetEpisodeAgentsWinAverage(), f
+        )
+        writer.add_scalar("Average EpisodeLength", Scores.returnEpisodeLength(), f)
+
+        # append to tensorboard
+        if f % 100 == 0:
+            writer.flush()
+        if f % 5000 == 0:
+            print("current iteration: {0} ".format(f))
+            print("  - epsilon: {0}".format(epsilon.get_epsilon(f)))
+            if Scores.AverageScoreRatio() is not None:
+                print(
+                    "  - average score ration agent/computer: {0}".format(
+                        Scores.AverageScoreRatio()
+                    )
+                )
+            print("  - replayBuffer Size: {0}".format(replayBuffer.currentSize))
+
         # update target net
         if f % config.target_network_update_freq == 0:
-            print("!! update target network !!")
-            Network_Target.load_state_dict(Network_Prediction.state_dict())
-
-        if f % 100000000 == 0:
-            print(
-                f"Step: {f} | Input Range: [{states.min().item():.3f}, {states.max().item():.3f}]"
+            target_network.load_state_dict(online_network.state_dict())
+            writer.add_scalar("updateTargetNetwork", 1, f)
+        else:
+            writer.add_scalar("updateTargetNetwork", 0, f)
+        # replay buffer and network
+        if f % 5000 == 0 and f > 1:
+            print("current iteration: {0} ".format(f))
+            print("  - saving replay buffer and model")
+            Networks.saveNetwork(
+                network=online_network, saveDir=config.saveDir, iteration=f
             )
-            print(f"Mean Q-Value: {predicted_q.mean().item():.4f}")
-            print(
-                f"Target Q-Value: {target_q.mean().item():.4f} | Loss: {loss.item():.6f}"
-            )
-
-    # save scores
-    if f % 20 == 0 :
-        Data.appendAverageScores()
-    # print
-    if f % 1000 == 0 and f > 1:
-        print("current iteration: {0} with epsilon {1}".format( f , epsilon) )
-        print("")
-        Data.PrintAverageScores()
-        Data.PrintAverageLosses(50)
-        Data.PrintAverageQvalues(50)
-        Data.PrintAverageTDerror(50)
-        print("replay current size: {0}".format(replayBuffer.currentSize) )
-        print("-------------------------------------")
-    if f % 50000 == 0 and f > 1:
-        # save files
-        replayBuffer.save_buffer(config.saveDir)
-        Networks.saveNetwork(
-            network=Network_Prediction, saveDir=config.saveDir, iteration=f
-        )
-        path = Path(config.saveDir) / "dataRecords"
-        path.mkdir(parents=True, exist_ok=True)
-        with open(path / "records", "wb") as fout:
-            pickle.dump(Data, fout)
-

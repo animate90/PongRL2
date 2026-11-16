@@ -8,17 +8,29 @@ N_STEPS = 5
 WINDOW_SIZE = 1 * N_STEPS + 1
 
 # List of files, custom labels, and assigned colors
-filenames =[
+filenames = [
     "modelWeights__Nov03_22-49-49_animatePlayedPongScores.csv",
     "modelWeights__Nov04_15-56-28_animatePlayedPongScores.csv",
-    "modelWeights__Nov05_07-44-49_animatePlayedPongScores.csv"
+    "modelWeights__Nov05_07-44-49_animatePlayedPongScores.csv",
 ]
 mainPath = Path(r"D:\PongRL2")
 
 experiments = [
-    {"file": mainPath / filenames[0], "label": "Model doubleDQN decay end 100000", "color": "#1f77b4"},
-    {"file": mainPath / filenames[1], "label": "Model doubleDQN decay end 200000", "color": "#ff7f0e"},
-    {"file": mainPath / filenames[2], "label": "Model doubleDQN decay end 300000", "color": "#2ca02c"},
+    {
+        "file": mainPath / filenames[0],
+        "label": "Model doubleDQN decay end 100000",
+        "color": "#1f77b4",
+    },
+    {
+        "file": mainPath / filenames[1],
+        "label": "Model doubleDQN decay end 200000",
+        "color": "#ff7f0e",
+    },
+    {
+        "file": mainPath / filenames[2],
+        "label": "Model doubleDQN decay end 300000",
+        "color": "#2ca02c",
+    },
 ]
 
 fig, ax = plt.subplots(figsize=(10, 6))
