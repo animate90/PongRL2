@@ -14,7 +14,9 @@ from pathlib import Path
 
 gym.register_envs(ale_py)
 
-
+# ------
+# play pong with a selected model fully esploitative
+# -----
 env = gym.make("ALE/Pong-v5", frameskip=4, render_mode="human")
 action_space_size = 6
 initial_obs, infos = env.reset()

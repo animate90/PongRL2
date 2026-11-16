@@ -13,7 +13,7 @@ filenames = [
     "modelWeights__Nov04_15-56-28_animatePlayedPongScores.csv",
     "modelWeights__Nov05_07-44-49_animatePlayedPongScores.csv",
 ]
-mainPath = Path(r"D:\PongRL2")
+mainPath = Path(r"/")
 
 experiments = [
     {
